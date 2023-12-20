@@ -45,7 +45,8 @@ struct FishAgesNum {
 
 using Real = double;
 
-void runLambdaInternal(std::ofstream& ofs, const FishAgesNum& opts, Real lambda0, bool isGroupI) {
+void runLambdaInternal(std::ofstream& ofs, const FishAgesNum& opts, Real lambda0, 
+            Real MwFactor, bool isGroupI) {
 
     struct Params{
         Real beta0 = 0, lambda0 = 0, Mw0 = 0;
@@ -56,18 +57,17 @@ void runLambdaInternal(std::ofstream& ofs, const FishAgesNum& opts, Real lambda0
     // N(beta0) = N(Mw1) + N(lambda2) + N(lambda1)
     // N(lambda2) =N(lambda1)*beta1/lambda1
 
-
     constexpr int nmins = 50;
     std::vector<Params> g_mins;
 
     omp_set_num_threads(8);
 
-    constexpr Real step = 0.0005;
+    constexpr Real step = 0.001;
     constexpr Real lambdaMin = 0.02, lambdaMax = 0.98;
     constexpr Real MpMin = 0.02, MpMax = 0.98;
     constexpr Real MwMin = 0.02, MwMax = 0.98;
 
-    constexpr Real MwFactor = 5;
+    //constexpr Real MwFactor = 5;
     constexpr Real betaMinDiff = 0.02, lambdaMinDiff = 0.02;
 
     const char *group = isGroupI ? "I" : "II";
@@ -114,7 +114,9 @@ void runLambdaInternal(std::ofstream& ofs, const FishAgesNum& opts, Real lambda0
             continue;
 
         cur.Mw1 = cur.Mw0 / MwFactor;
-
+        //for(cur.Mw1 = MwMin; cur.Mw1 <= cur.Mw0 / MwFactor; cur.Mw1 += step) 
+        {
+        
         for(cur.beta1 = step; cur.beta1 <= 1.0 - step; cur.beta1 += step) {
 
             Real lambda1 = 1.0 - cur.beta1 - cur.Mw1;
@@ -122,11 +124,26 @@ void runLambdaInternal(std::ofstream& ofs, const FishAgesNum& opts, Real lambda0
                  lambda1 >= lambdaMin && lambda1 <= lambdaMax))
                 continue;
 
-            if(!(cur.beta0 > cur.beta1 + betaMinDiff))
+            if(!(cur.beta1 > cur.beta0 + betaMinDiff))
                 continue;
 
+    // FishAgesNum groupI = {
+    //     48207, 6743, 2621
+    // };
+            // cur.beta0=0.054;
+            // cur.lambda0=0.25844;
+            // //cur.Mp0=0.36285
+            // //Mw0=0.306
+            // cur.beta1=0.262;
+            // lambda1=0.67;
+            // //Mw1=0.054
+
             auto val1 = opts.Nout0*cur.beta0*lambda1 - opts.Nout1*cur.lambda0,
-                 val2 = opts.Nout1*cur.beta1 - opts.Nout2*lambda1;
+                  val2 = opts.Nout1*cur.beta1 - opts.Nout2*lambda1;
+
+            // fprintf(stderr, "Nout: {%lld, %lld, %lld}; val1=%.2f; val2=%.2f\n", 
+            //             opts.Nout0, opts.Nout1, opts.Nout2, val1, val2);
+            // throw 1;
 
             cur.sum = std::abs(val1) + std::abs(val2);
 
@@ -139,16 +156,18 @@ void runLambdaInternal(std::ofstream& ofs, const FishAgesNum& opts, Real lambda0
                     mins[i] = cur;
                     break;
                 }
-            }
-        }
-    }
+            } // for i
+        }// for beta
+        } // for Mw1
+    } // for Mw0
     }
     } // for beta0
 
     #pragma omp critical
     {
         std::vector< Params > zmins(nmins + g_mins.size());
-        std::merge(mins, mins + nmins, g_mins.begin(), g_mins.end(), zmins.begin(), [](const Params& p1, const Params& p2)
+        std::merge(mins, mins + nmins, g_mins.begin(), g_mins.end(), zmins.begin(), 
+                [](const Params& p1, const Params& p2)
         {
             return p1.sum < p2.sum;
         });
@@ -178,12 +197,8 @@ void runLambdaInternal(std::ofstream& ofs, const FishAgesNum& opts, Real lambda0
         r.total++;
     };
 
-    Range beta0R, beta1R, Mw0R, Mw1R, lambda0R, lambda1R,
-            val1R, val2R;
+    Range beta0R, beta1R, Mw0R, Mw1R, lambda0R, lambda1R, val1R, val2R;
 
-    //std::stringstream out;
-
-    char bbf[256];
     for(const Params& item: g_mins) {
         Real lambda1 = 1.0 - item.beta1 - item.Mw1;
 
@@ -191,12 +206,8 @@ void runLambdaInternal(std::ofstream& ofs, const FishAgesNum& opts, Real lambda0
              val2 = std::abs(opts.Nout1*item.beta1/lambda1 - opts.Nout2);
 
         auto Mp0 = 1.0 - item.beta0 - item.lambda0 - item.Mw0;
-
         if(item.beta0 == 0.0)
             continue;
-
-        //if(val1 > 600 || val2 > 600)
-         //   continue;
 
         setMM(beta0R, item.beta0);
         setMM(beta1R, item.beta1);
@@ -207,53 +218,60 @@ void runLambdaInternal(std::ofstream& ofs, const FishAgesNum& opts, Real lambda0
         setMM(val1R, val1);
         setMM(val2R, val2);
 
+        static char bbf[256];
         sprintf(bbf, "%d ; %.5f ; %.5f ; %.5f ; %.5f ; %.5f ; %.5f ; %.5f ; %.2f ; %.2f\n",
             i++, item.beta0, item.lambda0, Mp0, item.Mw0, item.beta1, lambda1, item.Mw1, val1, val2);
         ofs << bbf;
     }
 }
 
-void runLambda() {
-
-    //constexpr int64_t shift = 26, mod = 1<<shift;
-    // this is a group I
-    FishAgesNum groupI = {
-        48207, 6743, 2621
+void runLambda() 
+{
+    auto S = [](int64_t X) {
+        Real mulC = 1.05 / 0.41;
+        return (int64_t)(X * mulC);
     };
-    FishAgesNum groupII = {
-        9339, 2833, 1103
-    };
-
-//    ofs << "GroupI; Nout0=" << groupI.Nout0 << "; Nout1=" << groupI.Nout1 << "; Nout2=" << groupI.Nout2 << "\n";
-//    ofs << "GroupII; Nout0=" << groupII.Nout0 << "; Nout1=" << groupII.Nout1 << "; Nout2=" << groupII.Nout2 << "\n";
-//    ofs << "FactorI=" << factorI << "; FactorII=" << factorII << "\n";
-
+    FishAgesNum groupI = {S(18831), S(2634), S(1024)};
+    FishAgesNum groupII = {S(3648), S(1107), S(431)};
+    
+    Real numFish = 260;
+    int i = 0;
+    //for(Real mwFactor = 5.5; mwFactor <= 7.5; mwFactor += 0.25, i++)
+    Real mwFactor = 5.0;
     {
+        int32_t numFish0 = 205;     // the total number of adult female fish species of group I
+        int32_t numFish1 = numFish - numFish0;  
+        static char buf[256];
+
         {
-        int32_t numFish = 198;          // the total number of adult female fish species of group I
         Real numFishEggs = 1000*0.95;   // the number of fish eggs survived from one female fish
-        Real total0 = numFish*numFishEggs;
-        Real lambda0_I = groupI.Nout0 / total0;
+        Real total = numFish0*numFishEggs;
+        Real lambda0_I = groupI.Nout0 / total;
 
-        std::ofstream ofs("LambdaSim_Fish" + std::to_string(numFish) + "_I.csv");
-        fprintf(stderr, "###### numFish = %lld #######\n", numFish);
+        sprintf(buf, "%d_FishDistr_%d_I.csv", i, numFish0);
+
+        std::ofstream ofs(buf);
+        ofs << "sep=;\n";
+        ofs << "GroupI; Nout0=" << groupI.Nout0 << "; Nout1=" << groupI.Nout1 << "; Nout2=" << groupI.Nout2 
+                << "; mWFactor=" << mwFactor << "\n";
         ofs << "No; beta0 ; lambda0 ; Mp0; Mw0 ; beta1 ; lambda1 ; Mw1 ; |A1-A2| ; |B1-B2|\n";
-        runLambdaInternal(ofs, groupI, lambda0_I, true);
+        runLambdaInternal(ofs, groupI, lambda0_I, mwFactor, true);
         }
 
         {
-        int32_t numFish = 62;             // the total number of adult female fish species of group II
         Real numFishEggs = 2000*0.95;     // the number of fish eggs survived from one female fish
-        Real total0 = numFish*numFishEggs;
-        Real lambda0_II = groupII.Nout0 / total0;
+        Real total = numFish1*numFishEggs;
+        Real lambda0_II = groupII.Nout0 / total;
 
-        std::ofstream ofs("LambdaSim_Fish" + std::to_string(numFish) + "_II.csv");
-         ofs << "No; beta0 ; lambda0 ; Mp0; Mw0 ; beta1 ; lambda1 ; Mw1 ; |A1-A2| ; |B1-B2|\n";
-        runLambdaInternal(ofs, groupII, lambda0_II, false);
+        sprintf(buf, "%d_FishDistr_%d_II.csv", i, numFish1);
+        std::ofstream ofs(buf);
+        ofs << "sep=;\n";
+        ofs << "GroupII; Nout0=" << groupII.Nout0 << "; Nout1=" << groupII.Nout1 << "; Nout2=" << groupII.Nout2 
+                << "; mWFactor=" << mwFactor << "\n";
+        ofs << "No; beta0 ; lambda0 ; Mp0; Mw0 ; beta1 ; lambda1 ; Mw1 ; |A1-A2| ; |B1-B2|\n";
+        runLambdaInternal(ofs, groupII, lambda0_II, mwFactor, false);
         }
-
-        //std::flush(ofs);
-    }
+    } 
 
     exit(1);
 }

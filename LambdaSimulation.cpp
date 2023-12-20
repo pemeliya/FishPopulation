@@ -247,15 +247,14 @@ void runLambda() {
              lambda0_II = groupII.Nout0 / (total0 * factorII);
 
         {
-        std::ofstream ofs("C:/work/LambdaSim_Fish" + std::to_string(numFish) + "_I.csv");
+        std::ofstream ofs("LambdaSim_Fish" + std::to_string(numFish) + "_I.csv");
         fprintf(stderr, "###### numFish = %lld #######\n", numFish);
         ofs << "No; beta0 ; lambda0 ; Mp0; Mw0 ; beta1 ; lambda1 ; Mw1 ; |A1-A2| ; |B1-B2|\n";
         runLambdaInternal(ofs, groupI, lambda0_I, true);
         }
 
         {
-        //ofs << "####### ; ########; #######;########;########;###########################\n";
-        std::ofstream ofs("C:/work/LambdaSim_Fish" + std::to_string(numFish) + "_II.csv");
+        std::ofstream ofs("LambdaSim_Fish" + std::to_string(numFish) + "_II.csv");
          ofs << "No; beta0 ; lambda0 ; Mp0; Mw0 ; beta1 ; lambda1 ; Mw1 ; |A1-A2| ; |B1-B2|\n";
         runLambdaInternal(ofs, groupII, lambda0_II, false);
         }
