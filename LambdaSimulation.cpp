@@ -122,7 +122,7 @@ void runLambdaInternal(std::ofstream& ofs, const FishAgesNum& opts, Real lambda0
                  lambda1 >= lambdaMin && lambda1 <= lambdaMax))
                 continue;
 
-            if(!(cur.beta0 > cur.beta1 + betaMinDiff))
+            if(!(cur.beta1 > cur.beta0 + betaMinDiff))
                 continue;
 
             auto val1 = opts.Nout0*cur.beta0*lambda1 - opts.Nout1*cur.lambda0,
