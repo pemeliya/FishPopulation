@@ -206,12 +206,30 @@ void runLambda()
     FishAgesNum groupI = {S(18831), S(2634), S(1024)};
     FishAgesNum groupII = {S(3648), S(1107), S(431)};
     
-    Real numFish = 260;
+    const std::array< int, 2 > numFish[] = {
+     {198, 113},
+     {336, 106},
+     {198, 100},
+     {296, 94},
+     {198, 88},
+     {257, 81},
+     {198, 75},
+     {217, 69},
+     {198, 63},
+     {178, 56},
+     {158, 50},
+     {138, 44},
+     {119, 38},
+     {99, 31},
+     {79, 25},
+     {59, 19},
+     {40, 13},
+    };
+
     int i = 0;
+    for(auto[numFish0, numFish1] : numFish) 
     for(Real mwFactor = 4; mwFactor <= 7; mwFactor += 0.5, i++)
     {
-        int32_t numFish0 = 205;     // the total number of adult female fish species of group I
-        int32_t numFish1 = numFish - numFish0;  
         static char buf[256];
 
         {
